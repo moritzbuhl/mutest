@@ -443,8 +443,8 @@ RCS file: /cvs/src/sys/kern/uipc_syscalls.c,v
 retrieving revision 1.194
 diff -u -p -r1.194 uipc_syscalls.c
 --- sys/kern/uipc_syscalls.c	24 Oct 2021 00:02:25 -0000	1.194
-+++ sys/kern/uipc_syscalls.c	13 Apr 2022 14:44:25 -0000
-@@ -565,6 +565,72 @@ done:
++++ sys/kern/uipc_syscalls.c	19 Apr 2022 06:26:49 -0000
+@@ -565,6 +565,79 @@ done:
  }
  
  int
@@ -457,8 +457,8 @@ diff -u -p -r1.194 uipc_syscalls.c
 +		syscallarg(int)			flags;
 +	} */ *uap = v;
 +	struct mmsghdr mmsg;
-+	struct iovec aiov[UIO_SMALLIOV], *iov;
-+	struct msghdr *msg = &mmsg.msg_hdr;
++	struct iovec aiov[UIO_SMALLIOV], *iov, *oiov;
++	struct msghdr *msg;
 +	unsigned int vlen, dg;
 +	int error;
 +
@@ -470,11 +470,13 @@ diff -u -p -r1.194 uipc_syscalls.c
 +		error = copyin(SCARG(uap, mmsg) + dg, &mmsg, sizeof(mmsg));
 +		if (error)
 +			break;
++
++		msg = &mmsg.msg_hdr;
++
 +#ifdef KTRACE
 +		if (KTRPOINT(p, KTR_STRUCT))
-+			ktrmsghdr(p, &msg);
++			ktrmsghdr(p, msg);
 +#endif
-+
 +
 +		if (msg->msg_iovlen > IOV_MAX)
 +			return (EMSGSIZE);
@@ -483,15 +485,18 @@ diff -u -p -r1.194 uipc_syscalls.c
 +			    M_IOV, M_WAITOK);
 +		else
 +			iov = aiov;
++
 +		if (msg->msg_iovlen != 0 &&
 +		    (error = copyin(msg->msg_iov, iov,
 +			    msg->msg_iovlen * sizeof (struct iovec))))
 +			break;
++
 +#ifdef KTRACE
 +		if (msg->msg_iovlen && KTRPOINT(p, KTR_STRUCT))
 +			ktriovec(p, iov, msg->msg_iovlen);
 +#endif
 +
++		oiov = msg->msg_iov;
 +		msg->msg_iov = iov;
 +		msg->msg_flags = 0;
 +
@@ -500,6 +505,8 @@ diff -u -p -r1.194 uipc_syscalls.c
 +		if (error)
 +			break;
 +
++// XXX: copy out iov instead?
++		msg->msg_iov = oiov;
 +		mmsg.msg_len = *retval;
 +		error = copyout(&mmsg, SCARG(uap, mmsg) + dg, sizeof(mmsg));
 +		if (error)
@@ -517,7 +524,7 @@ diff -u -p -r1.194 uipc_syscalls.c
  sendit(struct proc *p, int s, struct msghdr *mp, int flags, register_t *retsize)
  {
  	struct file *fp;
-@@ -761,6 +827,127 @@ done:
+@@ -761,6 +834,127 @@ done:
  	if (iov != aiov)
  		free(iov, M_IOV, sizeof(struct iovec) * msg.msg_iovlen);
  	return (error);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 Jan Klemkow <jan@openbsd.org>
- * Copyright (c) 2021 Moritz Buhl <mbuhl@openbsd.org>
+ * Copyright (c) 2021, 2022 Moritz Buhl <mbuhl@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#define MYVLEN          1024
+#define MYBUFSIZ        256
 
 void
 usage(void)
@@ -71,8 +74,9 @@ main(int argc, char *argv[])
 		err(EXIT_FAILURE, "socket");
 
 	if (mflag) {
-		struct mmsghdr	mmsg[256];
+		struct mmsghdr	mmsg[MYVLEN];
 		struct iovec	iov[nitems(mmsg)];
+		memset(mmsg, 0, sizeof(struct mmsghdr) * nitems(mmsg));
 
 		for (size_t i = 0; i < nitems(mmsg); i++) {
 			mmsg[i].msg_hdr.msg_name = &saddr;
@@ -80,21 +84,21 @@ main(int argc, char *argv[])
 			mmsg[i].msg_hdr.msg_iov = &iov[i];
 			mmsg[i].msg_hdr.msg_iovlen = 1;
 
-			iov[i].iov_base = malloc(BUFSIZ);
-			iov[i].iov_len = BUFSIZ;
+			iov[i].iov_base = malloc(MYBUFSIZ);
+			iov[i].iov_len = MYBUFSIZ;
 		}
 
 		while ((size = readv(fd, iov, nitems(iov))) > 0) {
-			unsigned int vlen = size / BUFSIZ;
+			unsigned int vlen = size / MYBUFSIZ;
 			unsigned int cnt = 0;
 
-			if (vlen * BUFSIZ < size)
+			if (vlen * MYBUFSIZ < size)
 				vlen++;
 
 			do {
 				int ret = sendmmsg(s, mmsg+cnt, vlen-cnt, 0);
 				if (ret == -1)
-					err(EXIT_FAILURE, "sendmsg");
+					err(EXIT_FAILURE, "sendmmsg");
 				cnt += ret;
 			} while (cnt < vlen);
 		}
@@ -102,7 +106,7 @@ main(int argc, char *argv[])
 
 	} else {
 		struct msghdr msg;
-		char buf[BUFSIZ];
+		char buf[MYBUFSIZ];
 
 		memset(&msg, 0, sizeof msg);
 		msg.msg_name = &saddr;

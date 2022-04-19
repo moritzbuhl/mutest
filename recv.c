@@ -32,6 +32,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#define MYVLEN          1024
+#define MYBUFSIZ        256
+
 bool run = true;
 
 void
@@ -94,7 +97,7 @@ main(int argc, char *argv[])
 		err(EXIT_FAILURE, "signal");
 
 	if (mflag) {
-		struct mmsghdr	mmsg[256];
+		struct mmsghdr	mmsg[MYVLEN];
 		struct iovec	iov[nitems(mmsg)];
 		int cnt;
 
@@ -102,8 +105,8 @@ main(int argc, char *argv[])
 			mmsg[i].msg_hdr.msg_iov = &iov[i];
 			mmsg[i].msg_hdr.msg_iovlen = 1;
 
-			iov[i].iov_base = malloc(BUFSIZ);
-			iov[i].iov_len = BUFSIZ;
+			iov[i].iov_base = malloc(MYBUFSIZ);
+			iov[i].iov_len = MYBUFSIZ;
 		}
  again:
 		while (run && (cnt = recvmmsg(s, mmsg, nitems(mmsg), MSG_DONTWAIT, NULL)) > 0) {
@@ -121,7 +124,7 @@ main(int argc, char *argv[])
 		}
 	} else {
 		struct msghdr msg;
-		char buf[BUFSIZ];
+		char buf[MYBUFSIZ];
 
 		memset(&msg, 0, sizeof msg);
 		msg.msg_iov = &(struct iovec) {
