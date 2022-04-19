@@ -889,7 +889,7 @@ RCS file: /cvs/src/sys/kern/uipc_syscalls.c,v
 retrieving revision 1.194
 diff -u -p -r1.194 uipc_syscalls.c
 --- sys/kern/uipc_syscalls.c	24 Oct 2021 00:02:25 -0000	1.194
-+++ sys/kern/uipc_syscalls.c	19 Apr 2022 06:26:49 -0000
++++ sys/kern/uipc_syscalls.c	19 Apr 2022 15:16:37 -0000
 @@ -565,6 +565,79 @@ done:
  }
  
@@ -988,7 +988,7 @@ diff -u -p -r1.194 uipc_syscalls.c
 +	} */ *uap = v;
 +	struct mmsghdr mmsg;
 +	struct timespec ts, now;
-+	struct iovec aiov[UIO_SMALLIOV], *uiov, *iov;
++	struct iovec aiov[UIO_SMALLIOV], *uiov, *iov = aiov;
 +	struct msghdr *msg = &mmsg.msg_hdr;
 +	struct timespec *timeout;
 +	unsigned int vlen, dg;
@@ -1086,7 +1086,7 @@ diff -u -p -r1.194 uipc_syscalls.c
 +	 * will catch it next time.
 +	 */
 +	if (error && dg > 0) {
-+		//so->so_rerror = error;
++		//so->so_rerror = error; // XXX
 +		error = 0;
 +	}
 +
