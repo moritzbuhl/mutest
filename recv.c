@@ -31,9 +31,11 @@
 #include <string.h>
 #include <unistd.h>
 
+int s;
 int run = 1;
 int msgs = 1024;
 int msgsiz = 256;
+size_t bytes;
 
 void
 status(int sig)
@@ -49,15 +51,81 @@ usage(void)
 	exit(1);
 }
 
+void
+recv_mmsg(int fd)
+{
+	struct mmsghdr	*mmsg;
+	struct iovec	*iov;
+	ssize_t size;
+	int cnt, i;
+
+	if ((mmsg = calloc(msgs, sizeof(struct mmsghdr))) == NULL)
+		err(1, NULL);
+
+	if ((iov = calloc(msgs, sizeof(struct iovec))) == NULL)
+		err(1, NULL);
+
+	for (i = 0; i < msgs; i++) {
+		mmsg[i].msg_hdr.msg_iov = &iov[i];
+		mmsg[i].msg_hdr.msg_iovlen = 1;
+
+		iov[i].iov_base = malloc(msgsiz);
+		iov[i].iov_len = msgsiz;
+	}
+
+again:
+	while ((cnt = recvmmsg(s, mmsg, msgs, MSG_DONTWAIT, NULL)) > 0) {
+		if ((size = writev(fd, iov, cnt)) == -1)
+			err(1, "writev");
+
+		bytes += size;
+	}
+
+	if (cnt == -1 && run) {
+		if (errno == EAGAIN)
+			goto again;
+
+		err(1, "recvmmsg");
+	}
+
+	for (i = 0; i < msgs; i++)
+		free(iov[i].iov_base);
+	free(iov);
+	free(mmsg);
+}
+
+void
+recv_msg(int fd)
+{
+	struct msghdr msg;
+	ssize_t size;
+	char buf[msgsiz];
+
+	memset(&msg, 0, sizeof msg);
+	msg.msg_iov = &(struct iovec) {
+		.iov_base = buf,
+		.iov_len = sizeof buf,
+	};
+	msg.msg_iovlen = 1;
+
+	while (run && (size = recvmsg(s, &msg, 0)) > 0) {
+		if ((size = write(fd, msg.msg_iov->iov_base, size)) == -1)
+			err(1, "write");
+
+		bytes += size;
+	}
+
+	if (size == -1)
+		err(1, "recvmsg");
+}
+
 int
 main(int argc, char *argv[])
 {
 	struct timeval start, end;
 	struct sockaddr_in saddr;
-	ssize_t size;
-	size_t bytes = 0;
 	const char *errstr;
-	int ch, fd, s, mflag = 0;
+	int ch, fd, mflag = 0;
 
 	while ((ch = getopt(argc, argv, "mn:s:")) != -1) {
 		switch (ch) {
@@ -104,66 +172,10 @@ main(int argc, char *argv[])
 	if (signal(SIGINT, status) == SIG_ERR)
 		err(1, "signal");
 
-	if (mflag) {
-		struct mmsghdr	*mmsg;
-		struct iovec	*iov;
-		int cnt;
-
-		if ((mmsg = calloc(msgs, sizeof(struct mmsghdr))) == NULL)
-			err(1, NULL);
-
-		if ((iov = calloc(msgs, sizeof(struct iovec))) == NULL)
-			err(1, NULL);
-
-		for (int i = 0; i < msgs; i++) {
-			mmsg[i].msg_hdr.msg_iov = &iov[i];
-			mmsg[i].msg_hdr.msg_iovlen = 1;
-
-			iov[i].iov_base = malloc(msgsiz);
-			iov[i].iov_len = msgsiz;
-		}
- again:
-		while ((cnt = recvmmsg(s, mmsg, msgs, MSG_DONTWAIT,
-		    NULL)) > 0) {
-			if ((size = writev(fd, iov, cnt)) == -1)
-				err(1, "writev");
-
-			bytes += size;
-		}
-
-		if (cnt == -1 && run) {
-			if (errno == EAGAIN)
-				goto again;
-
-			err(1, "recvmmsg");
-		}
-
-		for (int i = 0; i < msgs; i++)
-			free(iov[i].iov_base);
-		free(iov);
-		free(mmsg);
-
-	} else {
-		struct msghdr msg;
-		char buf[msgsiz];
-
-		memset(&msg, 0, sizeof msg);
-		msg.msg_iov = &(struct iovec) {
-			.iov_base = buf,
-			.iov_len = sizeof buf,
-		};
-		msg.msg_iovlen = 1;
-
-		while (run && (size = recvmsg(s, &msg, 0)) > 0) {
-			if ((size = write(fd, msg.msg_iov->iov_base, size)) == -1)
-				err(1, "write");
-
-			bytes += size;
-		}
-
-		if (size == -1)
-			err(1, "recvmsg");
-	}
+	if (mflag)
+		recv_mmsg(fd);
+	else
+	    recv_msg(fd);
 
 	close(s);
 	close(fd);

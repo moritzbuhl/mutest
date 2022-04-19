@@ -28,6 +28,7 @@
 #include <string.h>
 #include <unistd.h>
 
+int s;
 int msgs = 1024;
 int msgsiz = 256;
 
@@ -38,13 +39,83 @@ usage(void)
 	exit(1);
 }
 
+void
+send_mmsg(int fd, struct sockaddr_in *saddr)
+{
+	struct mmsghdr	*mmsg;
+	struct iovec	*iov;
+	ssize_t size;
+	int i, cnt, vlen;
+
+	if ((mmsg = calloc(msgs, sizeof(struct mmsghdr))) == NULL)
+		err(1, NULL);
+
+	if ((iov = calloc(msgs, sizeof(struct iovec))) == NULL)
+		err(1, NULL);
+
+	for (i = 0; i < msgs; i++) {
+		mmsg[i].msg_hdr.msg_name = saddr;
+		mmsg[i].msg_hdr.msg_namelen = sizeof(struct sockaddr_in);
+		mmsg[i].msg_hdr.msg_iov = &iov[i];
+		mmsg[i].msg_hdr.msg_iovlen = 1;
+
+		iov[i].iov_base = malloc(msgsiz);
+		iov[i].iov_len = msgsiz;
+	}
+
+	while ((size = readv(fd, iov, msgs)) > 0) {
+		vlen = size / msgsiz;
+		cnt = 0;
+
+		if (vlen * msgsiz < size)
+			vlen++;
+
+		do {
+			vlen -= cnt;
+			int ret = sendmmsg(s, mmsg + cnt, vlen, 0);
+			if (ret == -1)
+				err(1, "sendmmsg");
+			cnt += ret;
+		} while (vlen > 0);
+	}
+
+	for (i = 0; i < msgs; i++)
+		free(iov[i].iov_base);
+	free(iov);
+	free(mmsg);
+}
+
+void
+send_msg(int fd, struct sockaddr_in *saddr)
+{
+	struct msghdr msg;
+	ssize_t size;
+	char buf[msgsiz];
+
+	memset(&msg, 0, sizeof msg);
+	msg.msg_name = saddr;
+	msg.msg_namelen = sizeof(struct sockaddr_in);
+	msg.msg_iov = &(struct iovec) {
+		.iov_base = buf,
+	};
+	msg.msg_iovlen = 1;
+
+	while ((size = read(fd, buf, sizeof buf)) > 0) {
+		msg.msg_iov->iov_len = size;
+		if (sendmsg(s, &msg, 0) == -1)
+			err(1, "sendmsg");
+	}
+
+	if (size == -1)
+		err(1, "read");
+}
+
 int
 main(int argc, char *argv[])
 {
 	struct sockaddr_in saddr;
-	ssize_t size;
 	const char *errstr;
-	int ch, fd, s, mflag = 0;
+	int ch, fd, mflag = 0;
 
 	while ((ch = getopt(argc, argv, "mn:s:")) != -1) {
 		switch (ch) {
@@ -82,68 +153,10 @@ main(int argc, char *argv[])
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		err(1, "socket");
 
-	if (mflag) {
-		struct mmsghdr	*mmsg;
-		struct iovec	*iov;
-
-		if ((mmsg = calloc(msgs, sizeof(struct mmsghdr))) == NULL)
-			err(1, NULL);
-
-		if ((iov = calloc(msgs, sizeof(struct iovec))) == NULL)
-			err(1, NULL);
-
-		for (int i = 0; i < msgs; i++) {
-			mmsg[i].msg_hdr.msg_name = &saddr;
-			mmsg[i].msg_hdr.msg_namelen = sizeof saddr;
-			mmsg[i].msg_hdr.msg_iov = &iov[i];
-			mmsg[i].msg_hdr.msg_iovlen = 1;
-
-			iov[i].iov_base = malloc(msgsiz);
-			iov[i].iov_len = msgsiz;
-		}
-
-		while ((size = readv(fd, iov, msgs)) > 0) {
-			int vlen = size / msgsiz;
-			int cnt = 0;
-
-			if (vlen * msgsiz < size)
-				vlen++;
-
-			do {
-				vlen -= cnt;
-				int ret = sendmmsg(s, mmsg + cnt, vlen, 0);
-				if (ret == -1)
-					err(1, "sendmmsg");
-				cnt += ret;
-			} while (vlen > 0);
-		}
-
-		for (int i = 0; i < msgs; i++)
-			free(iov[i].iov_base);
-		free(iov);
-		free(mmsg);
-
-	} else {
-		struct msghdr msg;
-		char buf[msgsiz];
-
-		memset(&msg, 0, sizeof msg);
-		msg.msg_name = &saddr;
-		msg.msg_namelen = sizeof saddr;
-		msg.msg_iov = &(struct iovec) {
-			.iov_base = buf,
-		};
-		msg.msg_iovlen = 1;
-
-		while ((size = read(fd, buf, sizeof buf)) > 0) {
-			msg.msg_iov->iov_len = size;
-			if (sendmsg(s, &msg, 0) == -1)
-				err(1, "sendmsg");
-		}
-
-		if (size == -1)
-			err(1, "read");
-	}
+	if (mflag)
+		send_mmsg(fd, &saddr);
+	else
+		send_msg(fd, &saddr);
 
 	close(s);
 	close(fd);
