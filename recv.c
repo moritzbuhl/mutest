@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 Jan Klemkow <jan@openbsd.org>
- * Copyright (c) 2021 Moritz Buhl <mbuhl@openbsd.org>
+ * Copyright (c) 2021, 2022 Moritz Buhl <mbuhl@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,29 +26,27 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#define MYVLEN          1024
-#define MYBUFSIZ        256
-
-bool run = true;
+int run = 1;
+int msgs = 1024;
+int msgsiz = 256;
 
 void
 status(int sig)
 {
 	if (sig == SIGINT)
-		run = false;
+		run = 0;
 }
 
 void
 usage(void)
 {
-	fprintf(stderr, "recv [-m] file\n");
-	exit(EXIT_FAILURE);
+	fprintf(stderr, "recv [-m] [-n messages] [-s size] file\n");
+	exit(1);
 }
 
 int
@@ -57,14 +55,24 @@ main(int argc, char *argv[])
 	struct timeval start, end;
 	struct sockaddr_in saddr;
 	ssize_t size;
-	int ch, fd, s;
-	bool mflag = false;
 	size_t bytes = 0;
+	const char *errstr;
+	int ch, fd, s, mflag = 0;
 
-	while ((ch = getopt(argc, argv, "m")) != -1) {
+	while ((ch = getopt(argc, argv, "mn:s:")) != -1) {
 		switch (ch) {
 		case 'm':
-			mflag = true;
+			mflag = 1;
+			break;
+		case 'n':
+			msgs = strtonum(optarg, 0, INT_MAX, &errstr);
+                        if (errstr != NULL)
+                                errx(1, "msgs is %s: %s", errstr, optarg);
+			break;
+		case 's':
+			msgsiz = strtonum(optarg, 0, INT_MAX, &errstr);
+                        if (errstr != NULL)
+                                errx(1, "msgsiz is %s: %s", errstr, optarg);
 			break;
 		default:
 			usage();
@@ -82,49 +90,62 @@ main(int argc, char *argv[])
 	saddr.sin_port = htons(1234);
 
 	if ((fd = open(argv[0], O_WRONLY)) == -1)
-		err(EXIT_FAILURE, "%s", argv[0]);
+		err(1, "%s", argv[0]);
 
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		err(EXIT_FAILURE, "socket");
+		err(1, "socket");
 
 	if (bind(s, (struct sockaddr *)&saddr, sizeof saddr) == -1)
-		err(EXIT_FAILURE, "bind");
+		err(1, "bind");
 
 	if (gettimeofday(&start, NULL) == -1)
-		err(EXIT_FAILURE, "gettimeofday");
+		err(1, "gettimeofday");
 
 	if (signal(SIGINT, status) == SIG_ERR)
-		err(EXIT_FAILURE, "signal");
+		err(1, "signal");
 
 	if (mflag) {
-		struct mmsghdr	mmsg[MYVLEN];
-		struct iovec	iov[nitems(mmsg)];
+		struct mmsghdr	*mmsg;
+		struct iovec	*iov;
 		int cnt;
 
-		for (size_t i = 0; i < nitems(mmsg); i++) {
+		if ((mmsg = calloc(msgs, sizeof(struct mmsghdr))) == NULL)
+			err(1, NULL);
+
+		if ((iov = calloc(msgs, sizeof(struct iovec))) == NULL)
+			err(1, NULL);
+
+		for (int i = 0; i < msgs; i++) {
 			mmsg[i].msg_hdr.msg_iov = &iov[i];
 			mmsg[i].msg_hdr.msg_iovlen = 1;
 
-			iov[i].iov_base = malloc(MYBUFSIZ);
-			iov[i].iov_len = MYBUFSIZ;
+			iov[i].iov_base = malloc(msgsiz);
+			iov[i].iov_len = msgsiz;
 		}
  again:
-		while (run && (cnt = recvmmsg(s, mmsg, nitems(mmsg), MSG_DONTWAIT, NULL)) > 0) {
+		while ((cnt = recvmmsg(s, mmsg, msgs, MSG_DONTWAIT,
+		    NULL)) > 0) {
 			if ((size = writev(fd, iov, cnt)) == -1)
-				err(EXIT_FAILURE, "writev");
+				err(1, "writev");
 
 			bytes += size;
 		}
 
-		if (cnt == -1) {
+		if (cnt == -1 && run) {
 			if (errno == EAGAIN)
 				goto again;
 
-			err(EXIT_FAILURE, "recvmmsg");
+			err(1, "recvmmsg");
 		}
+
+		for (int i = 0; i < msgs; i++)
+			free(iov[i].iov_base);
+		free(iov);
+		free(mmsg);
+
 	} else {
 		struct msghdr msg;
-		char buf[MYBUFSIZ];
+		char buf[msgsiz];
 
 		memset(&msg, 0, sizeof msg);
 		msg.msg_iov = &(struct iovec) {
@@ -135,25 +156,23 @@ main(int argc, char *argv[])
 
 		while (run && (size = recvmsg(s, &msg, 0)) > 0) {
 			if ((size = write(fd, msg.msg_iov->iov_base, size)) == -1)
-				err(EXIT_FAILURE, "write");
+				err(1, "write");
 
 			bytes += size;
 		}
 
 		if (size == -1)
-			err(EXIT_FAILURE, "recvmsg");
+			err(1, "recvmsg");
 	}
 
-	if (close(s) == -1)
-		err(EXIT_FAILURE, "close");
-	if (close(fd) == -1)
-		err(EXIT_FAILURE, "close");
+	close(s);
+	close(fd);
 
 	if (gettimeofday(&end, NULL) == -1)
-		err(EXIT_FAILURE, "gettimeofday");
+		err(1, "gettimeofday");
 
 	printf("%zu bytes in %llu sec\n", bytes, end.tv_sec - start.tv_sec);
-	printf("%llu bytes/s\n", bytes / (end.tv_sec - start.tv_sec));
+	printf("%llu bytes/s\n", bytes / MAX(end.tv_sec - start.tv_sec, 1));
 
-	return EXIT_SUCCESS;
+	return 0;
 }
