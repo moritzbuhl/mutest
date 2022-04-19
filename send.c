@@ -45,7 +45,7 @@ send_mmsg(int fd, struct sockaddr_in *saddr)
 	struct mmsghdr	*mmsg;
 	struct iovec	*iov;
 	ssize_t size;
-	int i, cnt, vlen;
+	int i, cnt, ret, vlen;
 
 	if ((mmsg = calloc(msgs, sizeof(struct mmsghdr))) == NULL)
 		err(1, NULL);
@@ -71,12 +71,11 @@ send_mmsg(int fd, struct sockaddr_in *saddr)
 			vlen++;
 
 		do {
-			vlen -= cnt;
-			int ret = sendmmsg(s, mmsg + cnt, vlen, 0);
+			ret = sendmmsg(s, mmsg + cnt, vlen - cnt, 0);
 			if (ret == -1)
 				err(1, "sendmmsg");
 			cnt += ret;
-		} while (vlen > 0);
+		} while (cnt < vlen);
 	}
 
 	for (i = 0; i < msgs; i++)
