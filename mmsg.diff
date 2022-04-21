@@ -889,7 +889,7 @@ RCS file: /cvs/src/sys/kern/uipc_syscalls.c,v
 retrieving revision 1.194
 diff -u -p -r1.194 uipc_syscalls.c
 --- sys/kern/uipc_syscalls.c	24 Oct 2021 00:02:25 -0000	1.194
-+++ sys/kern/uipc_syscalls.c	21 Apr 2022 16:20:08 -0000
++++ sys/kern/uipc_syscalls.c	21 Apr 2022 19:38:54 -0000
 @@ -565,6 +565,84 @@ done:
  }
  
@@ -906,7 +906,7 @@ diff -u -p -r1.194 uipc_syscalls.c
 +	struct iovec aiov[UIO_SMALLIOV], *iov = aiov, *uiov;
 +	register_t retval;
 +	unsigned int vlen, dg;
-+	int error;
++	int error = 0;
 +
 +	vlen = SCARG(uap, vlen);
 +	if (vlen > 1024)
@@ -993,10 +993,10 @@ diff -u -p -r1.194 uipc_syscalls.c
 +	} */ *uap = v;
 +	struct mmsghdr mmsg;
 +	struct timespec ts, now;
-+	struct iovec aiov[UIO_SMALLIOV], *uiov, *iov;
++	struct iovec aiov[UIO_SMALLIOV], *uiov, *iov = aiov;
 +	struct timespec *timeout;
 +	unsigned int vlen, dg;
-+	int error, flags;
++	int error = 0, flags;
 +
 +	timeout = SCARG(uap, timeout);
 +	if (timeout != NULL) {
