@@ -889,12 +889,12 @@ RCS file: /cvs/src/sys/kern/uipc_syscalls.c,v
 retrieving revision 1.194
 diff -u -p -r1.194 uipc_syscalls.c
 --- sys/kern/uipc_syscalls.c	24 Oct 2021 00:02:25 -0000	1.194
-+++ sys/kern/uipc_syscalls.c	19 Apr 2022 15:16:37 -0000
-@@ -565,6 +565,79 @@ done:
++++ sys/kern/uipc_syscalls.c	21 Apr 2022 16:20:08 -0000
+@@ -565,6 +565,84 @@ done:
  }
  
  int
-+sys_sendmmsg(struct proc *p, void *v, register_t *retval)
++sys_sendmmsg(struct proc *p, void *v, register_t *retsize)
 +{
 +	struct sys_sendmmsg_args /* {
 +		syscallarg(int)			s;
@@ -903,8 +903,8 @@ diff -u -p -r1.194 uipc_syscalls.c
 +		syscallarg(int)			flags;
 +	} */ *uap = v;
 +	struct mmsghdr mmsg;
-+	struct iovec aiov[UIO_SMALLIOV], *iov, *oiov;
-+	struct msghdr *msg;
++	struct iovec aiov[UIO_SMALLIOV], *iov = aiov, *uiov;
++	register_t retval;
 +	unsigned int vlen, dg;
 +	int error;
 +
@@ -917,49 +917,54 @@ diff -u -p -r1.194 uipc_syscalls.c
 +		if (error)
 +			break;
 +
-+		msg = &mmsg.msg_hdr;
-+
 +#ifdef KTRACE
 +		if (KTRPOINT(p, KTR_STRUCT))
-+			ktrmsghdr(p, msg);
++			ktrmsghdr(p, &mmsg.msg_hdr);
 +#endif
 +
-+		if (msg->msg_iovlen > IOV_MAX)
++		if (mmsg.msg_hdr.msg_iovlen > IOV_MAX)
 +			return (EMSGSIZE);
-+		if (msg->msg_iovlen > UIO_SMALLIOV)
-+			iov = mallocarray(msg->msg_iovlen, sizeof(struct iovec),
-+			    M_IOV, M_WAITOK);
++		if (mmsg.msg_hdr.msg_iovlen > UIO_SMALLIOV)
++			iov = mallocarray(mmsg.msg_hdr.msg_iovlen,
++			    sizeof(struct iovec), M_IOV, M_WAITOK);
 +		else
 +			iov = aiov;
 +
-+		if (msg->msg_iovlen != 0 &&
-+		    (error = copyin(msg->msg_iov, iov,
-+			    msg->msg_iovlen * sizeof (struct iovec))))
++		if (mmsg.msg_hdr.msg_iovlen != 0 &&
++		    (error = copyin(mmsg.msg_hdr.msg_iov, iov,
++			    mmsg.msg_hdr.msg_iovlen * sizeof (struct iovec))))
 +			break;
 +
 +#ifdef KTRACE
-+		if (msg->msg_iovlen && KTRPOINT(p, KTR_STRUCT))
-+			ktriovec(p, iov, msg->msg_iovlen);
++		if (mmsg.msg_hdr.msg_iovlen && KTRPOINT(p, KTR_STRUCT))
++			ktriovec(p, iov, mmsg.msg_hdr.msg_iovlen);
 +#endif
 +
-+		oiov = msg->msg_iov;
-+		msg->msg_iov = iov;
-+		msg->msg_flags = 0;
-+
-+		error = sendit(p, SCARG(uap, s), msg, SCARG(uap, flags),
-+		    retval);
-+		if (error)
++		uiov = mmsg.msg_hdr.msg_iov;
++		mmsg.msg_hdr.msg_iov = iov;
++		mmsg.msg_hdr.msg_flags = 0;
++		if ((error = sendit(p, SCARG(uap, s), &mmsg.msg_hdr, SCARG(uap, flags),
++		    &retval)) != 0)
 +			break;
 +
-+// XXX: copy out iov instead?
-+		msg->msg_iov = oiov;
-+		mmsg.msg_len = *retval;
++		mmsg.msg_hdr.msg_iov = uiov;
++		if (iov != aiov) {
++			free(iov, M_IOV, sizeof(struct iovec) *
++			    mmsg.msg_hdr.msg_iovlen);
++			iov = aiov;
++		}
++
++		mmsg.msg_len = retval;
 +		error = copyout(&mmsg, SCARG(uap, mmsg) + dg, sizeof(mmsg));
 +		if (error)
 +			break;
 +	}
 +
-+	*retval = dg;
++	if (iov != aiov)
++		free(iov, M_IOV, sizeof(struct iovec) *
++		    mmsg.msg_hdr.msg_iovlen);
++
++	*retsize = dg;
 +
 +	if (dg)
 +		return 0;
@@ -970,7 +975,7 @@ diff -u -p -r1.194 uipc_syscalls.c
  sendit(struct proc *p, int s, struct msghdr *mp, int flags, register_t *retsize)
  {
  	struct file *fp;
-@@ -761,6 +834,127 @@ done:
+@@ -761,6 +839,126 @@ done:
  	if (iov != aiov)
  		free(iov, M_IOV, sizeof(struct iovec) * msg.msg_iovlen);
  	return (error);
@@ -988,8 +993,7 @@ diff -u -p -r1.194 uipc_syscalls.c
 +	} */ *uap = v;
 +	struct mmsghdr mmsg;
 +	struct timespec ts, now;
-+	struct iovec aiov[UIO_SMALLIOV], *uiov, *iov = aiov;
-+	struct msghdr *msg = &mmsg.msg_hdr;
++	struct iovec aiov[UIO_SMALLIOV], *uiov, *iov;
 +	struct timespec *timeout;
 +	unsigned int vlen, dg;
 +	int error, flags;
@@ -1014,29 +1018,29 @@ diff -u -p -r1.194 uipc_syscalls.c
 +		if (error != 0)
 +			break;
 +
-+		if (msg->msg_iovlen > IOV_MAX) {
++		if (mmsg.msg_hdr.msg_iovlen > IOV_MAX) {
 +			error = EMSGSIZE;
 +			break;
 +		}
 +
-+		if (msg->msg_iovlen > UIO_SMALLIOV)
-+			iov = mallocarray(msg->msg_iovlen,
++		if (mmsg.msg_hdr.msg_iovlen > UIO_SMALLIOV)
++			iov = mallocarray(mmsg.msg_hdr.msg_iovlen,
 +			    sizeof(struct iovec), M_IOV, M_WAITOK);
 +		else
 +			iov = aiov;
 +
-+		if (msg->msg_iovlen > 0) {
-+			error = copyin(msg->msg_iov, iov,
-+			    msg->msg_iovlen * sizeof(struct iovec));
++		if (mmsg.msg_hdr.msg_iovlen > 0) {
++			error = copyin(mmsg.msg_hdr.msg_iov, iov,
++			    mmsg.msg_hdr.msg_iovlen * sizeof(struct iovec));
 +			if (error)
 +				break;
 +		}
 +
-+		uiov = msg->msg_iov;
-+		msg->msg_iov = iov;
-+		msg->msg_flags = flags;
++		uiov = mmsg.msg_hdr.msg_iov;
++		mmsg.msg_hdr.msg_iov = iov;
++		mmsg.msg_hdr.msg_flags = flags;
 +
-+		error = recvit(p, SCARG(uap, s), msg, NULL, retval);
++		error = recvit(p, SCARG(uap, s), &mmsg.msg_hdr, NULL, retval);
 +		if (error != 0) {
 +			if (error == EAGAIN && dg > 0)
 +				error = 0;
@@ -1048,13 +1052,13 @@ diff -u -p -r1.194 uipc_syscalls.c
 +			flags |= MSG_DONTWAIT;
 +		}
 +
-+		msg->msg_iov = uiov;
++		mmsg.msg_hdr.msg_iov = uiov;
 +		mmsg.msg_len = *retval;
 +#ifdef KTRACE
 +		if (KTRPOINT(p, KTR_STRUCT)) {
-+			ktrmsghdr(p, &msg);
-+			if (msg->msg_iovlen)
-+				ktriovec(p, iov, msg->msg_iovlen);
++			ktrmsghdr(p, &mmsg.msg_hdr);
++			if (mmsg.msg_hdr.msg_iovlen)
++				ktriovec(p, iov, mmsg.msg_hdr.msg_iovlen);
 +		}
 +#endif
 +
@@ -1063,12 +1067,13 @@ diff -u -p -r1.194 uipc_syscalls.c
 +			break;
 +
 +		if (iov != aiov) {
-+			free(iov, M_IOV, sizeof(struct iovec) * msg->msg_iovlen);
++			free(iov, M_IOV, sizeof(struct iovec) *
++			    mmsg.msg_hdr.msg_iovlen);
 +			iov = aiov;
 +		}
 +
 +		dg++;
-+		if (msg->msg_flags & MSG_OOB)
++		if (mmsg.msg_hdr.msg_flags & MSG_OOB)
 +			break;
 +
 +		if (timeout != NULL) {
@@ -1090,9 +1095,8 @@ diff -u -p -r1.194 uipc_syscalls.c
 +		error = 0;
 +	}
 +
-+	if (iov != aiov) {
-+		free(iov, M_IOV, sizeof(struct iovec) * msg->msg_iovlen);
-+	}
++	if (iov != aiov)
++		free(iov, M_IOV, sizeof(struct iovec) * mmsg.msg_hdr.msg_iovlen);
 +
 +	return error;
  }
