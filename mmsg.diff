@@ -4,7 +4,7 @@ RCS file: /cvs/src/lib/libc/Symbols.list,v
 retrieving revision 1.74
 diff -u -p -r1.74 Symbols.list
 --- lib/libc/Symbols.list	3 Jun 2021 13:19:45 -0000	1.74
-+++ lib/libc/Symbols.list	13 Apr 2022 18:57:01 -0000
++++ lib/libc/Symbols.list	22 Apr 2022 16:03:30 -0000
 @@ -176,6 +176,7 @@ _thread_sys_readv
  _thread_sys_reboot
  _thread_sys_recvfrom
@@ -43,7 +43,7 @@ RCS file: /cvs/src/lib/libc/shlib_version,v
 retrieving revision 1.210
 diff -u -p -r1.210 shlib_version
 --- lib/libc/shlib_version	2 Jun 2021 07:29:03 -0000	1.210
-+++ lib/libc/shlib_version	13 Apr 2022 14:24:15 -0000
++++ lib/libc/shlib_version	22 Apr 2022 16:03:30 -0000
 @@ -1,4 +1,4 @@
  major=96
 -minor=1
@@ -56,7 +56,7 @@ RCS file: /cvs/src/lib/libc/hidden/sys/socket.h,v
 retrieving revision 1.4
 diff -u -p -r1.4 socket.h
 --- lib/libc/hidden/sys/socket.h	7 May 2016 19:05:22 -0000	1.4
-+++ lib/libc/hidden/sys/socket.h	13 Apr 2022 14:24:15 -0000
++++ lib/libc/hidden/sys/socket.h	22 Apr 2022 16:03:30 -0000
 @@ -33,8 +33,10 @@ PROTO_NORMAL(listen);
  PROTO_NORMAL(recv);
  PROTO_CANCEL(recvfrom);
@@ -74,7 +74,7 @@ RCS file: /cvs/src/lib/libc/sys/Makefile.inc,v
 retrieving revision 1.161
 diff -u -p -r1.161 Makefile.inc
 --- lib/libc/sys/Makefile.inc	23 Dec 2021 18:50:32 -0000	1.161
-+++ lib/libc/sys/Makefile.inc	13 Apr 2022 19:13:35 -0000
++++ lib/libc/sys/Makefile.inc	22 Apr 2022 16:03:30 -0000
 @@ -34,8 +34,8 @@ CANCEL=	accept accept4 \
  	nanosleep \
  	open openat \
@@ -92,7 +92,7 @@ RCS file: /cvs/src/lib/libc/sys/recv.2,v
 retrieving revision 1.48
 diff -u -p -r1.48 recv.2
 --- lib/libc/sys/recv.2	21 Nov 2021 23:44:55 -0000	1.48
-+++ lib/libc/sys/recv.2	22 Apr 2022 15:15:50 -0000
++++ lib/libc/sys/recv.2	22 Apr 2022 16:03:30 -0000
 @@ -46,15 +46,35 @@
  .Fn recvfrom "int s" "void *buf" "size_t len" "int flags" "struct sockaddr *from" "socklen_t *fromlen"
  .Ft ssize_t
@@ -266,7 +266,7 @@ RCS file: /cvs/src/lib/libc/sys/send.2,v
 retrieving revision 1.34
 diff -u -p -r1.34 send.2
 --- lib/libc/sys/send.2	11 Jan 2019 06:10:13 -0000	1.34
-+++ lib/libc/sys/send.2	22 Apr 2022 15:15:28 -0000
++++ lib/libc/sys/send.2	22 Apr 2022 16:03:30 -0000
 @@ -36,7 +36,8 @@
  .Sh NAME
  .Nm send ,
@@ -343,7 +343,7 @@ Index: lib/libc/sys/w_recvmmsg.c
 RCS file: lib/libc/sys/w_recvmmsg.c
 diff -N lib/libc/sys/w_recvmmsg.c
 --- /dev/null	1 Jan 1970 00:00:00 -0000
-+++ lib/libc/sys/w_recvmmsg.c	22 Apr 2022 15:14:29 -0000
++++ lib/libc/sys/w_recvmmsg.c	22 Apr 2022 16:03:30 -0000
 @@ -0,0 +1,32 @@
 +/*	$OpenBSD$ */
 +/*
@@ -382,7 +382,7 @@ Index: lib/libc/sys/w_sendmmsg.c
 RCS file: lib/libc/sys/w_sendmmsg.c
 diff -N lib/libc/sys/w_sendmmsg.c
 --- /dev/null	1 Jan 1970 00:00:00 -0000
-+++ lib/libc/sys/w_sendmmsg.c	22 Apr 2022 15:14:16 -0000
++++ lib/libc/sys/w_sendmmsg.c	22 Apr 2022 16:03:30 -0000
 @@ -0,0 +1,31 @@
 +/*	$OpenBSD$ */
 +/*
@@ -421,7 +421,7 @@ RCS file: /cvs/src/regress/lib/libc/sys/Makefile,v
 retrieving revision 1.15
 diff -u -p -r1.15 Makefile
 --- regress/lib/libc/sys/Makefile	6 Jan 2022 03:30:15 -0000	1.15
-+++ regress/lib/libc/sys/Makefile	19 Apr 2022 10:31:27 -0000
++++ regress/lib/libc/sys/Makefile	22 Apr 2022 16:03:30 -0000
 @@ -54,8 +54,10 @@ PROGS +=	t_pipe2
  PROGS +=	t_poll
  PROGS +=	t_ppoll
@@ -439,7 +439,7 @@ RCS file: /cvs/src/regress/lib/libc/sys/atf-c.h,v
 retrieving revision 1.3
 diff -u -p -r1.3 atf-c.h
 --- regress/lib/libc/sys/atf-c.h	2 Sep 2021 12:40:44 -0000	1.3
-+++ regress/lib/libc/sys/atf-c.h	19 Apr 2022 10:31:54 -0000
++++ regress/lib/libc/sys/atf-c.h	22 Apr 2022 16:03:30 -0000
 @@ -76,6 +76,7 @@ ATF_TC_FUNCTIONS(fn)
  #define ATF_CHECK		ATF_REQUIRE
  #define ATF_CHECK_MSG		ATF_REQUIRE_MSG
@@ -453,7 +453,7 @@ Index: regress/lib/libc/sys/t_recvmmsg.c
 RCS file: regress/lib/libc/sys/t_recvmmsg.c
 diff -N regress/lib/libc/sys/t_recvmmsg.c
 --- /dev/null	1 Jan 1970 00:00:00 -0000
-+++ regress/lib/libc/sys/t_recvmmsg.c	19 Apr 2022 10:33:05 -0000
++++ regress/lib/libc/sys/t_recvmmsg.c	22 Apr 2022 16:03:30 -0000
 @@ -0,0 +1,188 @@
 +/*	$NetBSD: t_recvmmsg.c,v 1.4 2018/08/21 10:39:21 christos Exp $	*/
 +
@@ -648,7 +648,7 @@ Index: regress/lib/libc/sys/t_sendmmsg.c
 RCS file: regress/lib/libc/sys/t_sendmmsg.c
 diff -N regress/lib/libc/sys/t_sendmmsg.c
 --- /dev/null	1 Jan 1970 00:00:00 -0000
-+++ regress/lib/libc/sys/t_sendmmsg.c	19 Apr 2022 10:32:54 -0000
++++ regress/lib/libc/sys/t_sendmmsg.c	22 Apr 2022 16:03:30 -0000
 @@ -0,0 +1,211 @@
 +/*	$NetBSD: t_sendmmsg.c,v 1.3 2019/03/16 21:46:43 christos Exp $	*/
 +
@@ -867,7 +867,7 @@ RCS file: /cvs/src/sys/kern/init_sysent.c,v
 retrieving revision 1.235
 diff -u -p -r1.235 init_sysent.c
 --- sys/kern/init_sysent.c	24 Feb 2022 07:43:02 -0000	1.235
-+++ sys/kern/init_sysent.c	22 Apr 2022 15:59:51 -0000
++++ sys/kern/init_sysent.c	22 Apr 2022 16:03:30 -0000
 @@ -1,4 +1,4 @@
 -/*	$OpenBSD: init_sysent.c,v 1.235 2022/02/24 07:43:02 mvs Exp $	*/
 +/*	$OpenBSD$	*/
@@ -890,7 +890,7 @@ RCS file: /cvs/src/sys/kern/syscalls.c,v
 retrieving revision 1.234
 diff -u -p -r1.234 syscalls.c
 --- sys/kern/syscalls.c	24 Feb 2022 07:43:03 -0000	1.234
-+++ sys/kern/syscalls.c	22 Apr 2022 15:59:51 -0000
++++ sys/kern/syscalls.c	22 Apr 2022 16:03:30 -0000
 @@ -1,4 +1,4 @@
 -/*	$OpenBSD: syscalls.c,v 1.234 2022/02/24 07:43:03 mvs Exp $	*/
 +/*	$OpenBSD$	*/
@@ -910,7 +910,7 @@ RCS file: /cvs/src/sys/kern/syscalls.master,v
 retrieving revision 1.223
 diff -u -p -r1.223 syscalls.master
 --- sys/kern/syscalls.master	24 Feb 2022 07:41:51 -0000	1.223
-+++ sys/kern/syscalls.master	22 Apr 2022 15:32:41 -0000
++++ sys/kern/syscalls.master	22 Apr 2022 16:03:30 -0000
 @@ -575,3 +575,9 @@
  328	OBSOL		__tfork51
  329	STD NOLOCK	{ void sys___set_tcb(void *tcb); }
@@ -927,7 +927,7 @@ RCS file: /cvs/src/sys/kern/uipc_syscalls.c,v
 retrieving revision 1.194
 diff -u -p -r1.194 uipc_syscalls.c
 --- sys/kern/uipc_syscalls.c	24 Oct 2021 00:02:25 -0000	1.194
-+++ sys/kern/uipc_syscalls.c	22 Apr 2022 15:33:17 -0000
++++ sys/kern/uipc_syscalls.c	22 Apr 2022 16:03:30 -0000
 @@ -565,6 +565,84 @@ done:
  }
  
@@ -1146,7 +1146,7 @@ RCS file: /cvs/src/sys/sys/socket.h,v
 retrieving revision 1.102
 diff -u -p -r1.102 socket.h
 --- sys/sys/socket.h	22 Feb 2022 01:01:02 -0000	1.102
-+++ sys/sys/socket.h	22 Apr 2022 15:29:55 -0000
++++ sys/sys/socket.h	22 Apr 2022 16:03:30 -0000
 @@ -490,6 +490,11 @@ struct msghdr {
  	int		msg_flags;	/* flags on received message */
  };
@@ -1184,7 +1184,7 @@ RCS file: /cvs/src/sys/sys/syscall.h,v
 retrieving revision 1.232
 diff -u -p -r1.232 syscall.h
 --- sys/sys/syscall.h	24 Feb 2022 07:43:03 -0000	1.232
-+++ sys/sys/syscall.h	22 Apr 2022 15:59:51 -0000
++++ sys/sys/syscall.h	22 Apr 2022 16:03:30 -0000
 @@ -1,4 +1,4 @@
 -/*	$OpenBSD: syscall.h,v 1.232 2022/02/24 07:43:03 mvs Exp $	*/
 +/*	$OpenBSD$	*/
@@ -1209,7 +1209,7 @@ RCS file: /cvs/src/sys/sys/syscallargs.h,v
 retrieving revision 1.235
 diff -u -p -r1.235 syscallargs.h
 --- sys/sys/syscallargs.h	24 Feb 2022 07:43:03 -0000	1.235
-+++ sys/sys/syscallargs.h	22 Apr 2022 15:59:51 -0000
++++ sys/sys/syscallargs.h	22 Apr 2022 16:03:30 -0000
 @@ -1,4 +1,4 @@
 -/*	$OpenBSD: syscallargs.h,v 1.235 2022/02/24 07:43:03 mvs Exp $	*/
 +/*	$OpenBSD$	*/
